@@ -1,29 +1,35 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Ai Chat</title>
+  <title>AI チャット</title>
   <style>
     body { font-family: Arial, sans-serif; background:#f1f3f5; margin:0; padding:20px;}
     #chat  { max-width:680px; margin:auto; background:white; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.1);}
     #messages { height:420px; overflow-y:auto; border:1px solid #ddd; padding:12px; margin-bottom:10px;}
-    .msg { margin:8px 0; line-height:1.4;}
-    .user { color:#0b5cff; font-weight:bold;}
+    .msg { margin:8px 0; line-height:1.4; }
+    .user { color:#0b5cff; font-weight:bold; }
     .bot  { color:#22863a; }
     #inputBar { display:flex; gap:8px; }
     input[type=text]{ flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;}
-    button{ padding:8px 16px; border:none; background:#0b5cff; color:white; border-radius:6px; cursor:pointer;}
+    button{ padding:8px 16px; border:none; background:#0b5cff; color:white; border-radius:6px; cursor:pointer; }
     button:disabled{ background:#888; }
+    #modelBar { margin-bottom:10px; }
+    select{ padding:6px; border-radius:6px; border:1px solid #ccc; }
   </style>
 </head>
 <body>
   <div id="chat">
-    <h2>🧠 Chat</h2>
+    <h2>🧠 AI チャット</h2>
+    <div id="modelBar">
+      <label for="modelSelect">モデル選択:</label>
+      <select id="modelSelect"></select>
+    </div>
     <div id="messages"></div>
 
     <div id="inputBar">
-      <input id="input" type="text" placeholder="入力してください。(Enter発送)…"/>
-      <button id="sendBtn">send</button>
+      <input id="input" type="text" placeholder="メッセージを入力してください（Enterキーで送信）"/>
+      <button id="sendBtn">送信</button>
     </div>
   </div>
 
@@ -33,9 +39,10 @@
     const input    = document.getElementById('input');
     const sendBtn  = document.getElementById('sendBtn');
     const messages = document.getElementById('messages');
-    let  currentBotDiv = null;   // 正在流式输出的 div
+    const modelSelect = document.getElementById('modelSelect');
+    let currentBotDiv = null;
 
-    // 工具：追加一条消息
+    // メッセージ表示
     function append(text, cls){
       const div = document.createElement('div');
       div.className = 'msg ' + cls;
@@ -45,22 +52,37 @@
       return div;
     }
 
-    // 发送
+    // モデル一覧取得後、セレクトボックスを生成
+    socket.on('modelList', (models) => {
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        modelSelect.appendChild(opt);
+      });
+    });
+
+    // モデル選択変更時イベント
+    modelSelect.addEventListener('change', () => {
+      socket.emit('selectModel', modelSelect.value);
+    });
+
+    // チャット送信
     function send(){
       const text = input.value.trim();
       if(!text) return;
-      append('you: ' + text, 'user');
+      append('あなた: ' + text, 'user');
       socket.emit('userMessage', text);
       input.value = '';
       input.focus();
     }
 
-    // Bot 开始回复：先放一个空行
+    // ストリーム開始
     socket.on('botStart', () => {
       currentBotDiv = append('AI: ', 'bot');
     });
 
-    // 每到一小段文本就追加
+    // ストリーム受信
     socket.on('botStream', chunk => {
       if(currentBotDiv){
         currentBotDiv.textContent += chunk;
@@ -68,12 +90,12 @@
       }
     });
 
-    // 结束
+    // ストリーム終了
     socket.on('botDone', () => {
       currentBotDiv = null;
     });
 
-    // 键盘 Enter
+    // Enterキー送信
     input.addEventListener('keydown', e => { if(e.key === 'Enter') send(); });
     sendBtn.addEventListener('click', send);
   </script>
